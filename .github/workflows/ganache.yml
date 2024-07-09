@@ -1,4 +1,4 @@
-name: Run Ganache-CLI and Tests
+name: Run Ganache-CLI with ngrok
 
 on: [push]
 
@@ -18,11 +18,30 @@ jobs:
     - name: Install Ganache-CLI
       run: npm install -g ganache-cli
 
-    - name: Run Ganache-CLI
-      run: ganache-cli -p 8545 &
-      # Add any additional ganache-cli options you need here
+    - name: Start Ganache-CLI
+      run: nohup ganache-cli -h 0.0.0.0 -p 8545 &
 
     - name: Wait for Ganache-CLI to start
       run: sleep 5
 
+    - name: Install ngrok
+      run: curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null && \
+            echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list && \
+            sudo apt update && sudo apt install ngrok
 
+    - name: Authenticate ngrok
+      run: ngrok authtoken ${{ secrets.NGROK_AUTH_TOKEN }}
+
+    - name: Start ngrok
+      run: nohup ngrok http 8545 &
+
+    - name: Get ngrok URL
+      run: sleep 5 && curl --silent --show-error http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Run tests
+      env:
+        GANACHE_URL: http://127.0.0.1:8545
+      run: npm test
